@@ -170,7 +170,10 @@ class SpacyClassifier(BaseEstimator, ClassifierMixin):
     
     def predict(self, X):
         def binarize_output(x):
-            cats = self.nlp(x).cats
+            def get_cats(x):
+                cats = self.nlp(x).cats
+                return cats
+            cats = get_cats(x)
             out = [
                 1 if cats[label] > self.threshold else 0
                 for label in self.unique_labels
