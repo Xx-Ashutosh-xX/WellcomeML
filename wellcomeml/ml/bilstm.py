@@ -3,6 +3,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import f1_score
 import tensorflow as tf
 
+from wellcomeml.ml.attention import SimpleAttention
 from wellcomeml.ml.keras_utils import Metrics
 
 class BiLSTMClassifier(BaseEstimator, ClassifierMixin):
@@ -40,7 +41,10 @@ class BiLSTMClassifier(BaseEstimator, ClassifierMixin):
             )(inp)
         x = residual_bilstm(x, l2)
         x = residual_bilstm(x, l2)
-        x = tf.keras.layers.GlobalMaxPooling1D()(x)
+#        x = SimpleAttention()(x)
+#        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.GlobalAveragePooling1D()(x)
+        x = tf.keras.layers.Dropout(self.dropout)(x)
         x = tf.keras.layers.Dense(20, kernel_regularizer=l2)(x)
         out = tf.keras.layers.Dense(nb_outputs, activation=output_activation, kernel_regularizer=l2)(x)
         self.model = tf.keras.Model(inp, out)

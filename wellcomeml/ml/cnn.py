@@ -15,6 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 import tensorflow as tf
 
+from wellcomeml.ml.attention import SimpleAttention, AttentionMatrix
 from wellcomeml.ml.keras_utils import Metrics
 
 class CNNClassifier(BaseEstimator, ClassifierMixin):
@@ -49,6 +50,18 @@ class CNNClassifier(BaseEstimator, ClassifierMixin):
             x2 = tf.keras.layers.LayerNormalization()(x2)
             return tf.keras.layers.add([x1, x2])
 
+        def residual_attention(x1):
+            x2 = AttentionMatrix()(x1)
+            x2 = tf.keras.layers.Dropout(self.dropout)(x2)
+            x2 = tf.keras.layers.LayerNormalization()(x2)
+            return tf.keras.layers.add([x1, x2])
+
+        def residual_dense(x1):
+            x2 = tf.keras.layers.Dense(100, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(1e-6))(x1)
+            x2 = tf.keras.layers.Dropout(self.dropout)(x2)
+            x2 = tf.keras.layers.LayerNormalization()(x2)
+            return tf.keras.layers.add([x1, x2])
+
         embeddings_initializer = tf.keras.initializers.Constant(embedding_matrix) if embedding_matrix else 'uniform'
         inp = tf.keras.layers.Input(shape=(sequence_length,))
         x = tf.keras.layers.Embedding(
@@ -59,14 +72,14 @@ class CNNClassifier(BaseEstimator, ClassifierMixin):
         x = tf.keras.layers.LayerNormalization()(x)
         for i in range(self.nb_layers):
             x = residual_conv_block(x)
+#        x = residual_attention(x)
         x = tf.keras.layers.GlobalMaxPooling1D()(x)
-        x = tf.keras.layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(1e-6))(x)
-        x = tf.keras.layers.Dropout(self.dropout)(x)
-        x = tf.keras.layers.LayerNormalization()(x)
+        x = residual_dense(x)
 
         output_activation = 'sigmoid' if nb_outputs==1 or self.multilabel else 'softmax'
         out = tf.keras.layers.Dense(nb_outputs, activation=output_activation, kernel_regularizer=tf.keras.regularizers.l2(1e-6))(x)
         self.model = tf.keras.Model(inp, out)
+        print(self.model.summary())
 
         optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate, clipnorm=1.0)
         self.model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[])
